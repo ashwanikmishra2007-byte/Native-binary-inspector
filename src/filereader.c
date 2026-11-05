@@ -4,12 +4,8 @@
 #include "filereader.h"
 #include <windows.h>
 
-Binstorage *create(size_t buffersize)
+Binstorage *create(void)
 {
-    if (buffersize == 0)
-    {
-        return NULL;
-    }
 
     Binstorage *store = malloc(sizeof(*store));
 
@@ -19,24 +15,13 @@ Binstorage *create(size_t buffersize)
     }
 
     store->file = INVALID_HANDLE_VALUE;
-    store->position = 0;
     store->size = 0;
-    store->buffer_size = buffersize;
-    store->data = malloc(buffersize);
-
-    if (store->data == NULL)
-    {
-        free(store);
-        return NULL;
-    }
-
-    store->bytesread = 0;
-    store->error_code = 0;
+    store->error_code = ERROR_SUCCESS;
 
     return store;
 }
 
-Openstatus open_file(Binstorage*store,const wchar_t *path)
+Openstatus open_file(Binstorage *store, const wchar_t *path)
 {
 
     if (path == NULL)
@@ -47,11 +32,12 @@ Openstatus open_file(Binstorage*store,const wchar_t *path)
 
     if (store == NULL)
     {
-        printf("Could not allocate meomory\n");
+        printf("Could not allocate memory\n");
         return OPEN_INVALID_ARGUMENT;
     }
 
-    if(store->file!=INVALID_HANDLE_VALUE){
+    if (store->file != INVALID_HANDLE_VALUE)
+    {
         return OPEN_ALREADY_OPEN;
     }
 
@@ -61,8 +47,8 @@ Openstatus open_file(Binstorage*store,const wchar_t *path)
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, /*FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, allowing other processes to read,
        write, or delete the file while we have it open, subject to Windows' sharing rules.*/
         NULL,
-        OPEN_EXISTING,         /*OPEN_EXISTING, because we must inspect an existing file, never create a missing one.*/
-        FILE_ATTRIBUTE_NORMAL, /*FILE_ATTRIBUTE_NORMAL for ordinary file access.*/
+        OPEN_EXISTING,                                /*OPEN_EXISTING, because we must inspect an existing file, never create a missing one.*/
+        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, /*FILE_ATTRIBUTE_NORMAL for ordinary file access, and FILE_FLAG_OVERLAPPED to enable asynchronous I/O operations.*/
         NULL);
     wprintf(L"Attempting to open: [%ls]\n", path);
     if (file == INVALID_HANDLE_VALUE)
@@ -71,42 +57,56 @@ Openstatus open_file(Binstorage*store,const wchar_t *path)
 
         printf("CreateFileW failed. Error code: %lu\n",
                (unsigned long)error);
+        store->error_code = error;
         return OPEN_ERROR;
     }
-
 
     LARGE_INTEGER filesize;
 
     if (!GetFileSizeEx(file, &filesize))
     { // Get file size didnt work
-        DWORD error= GetLastError();
+        DWORD error = GetLastError();
         CloseHandle(file);
+        store->file = INVALID_HANDLE_VALUE;
         printf("Function failed\n");
-        store->error_code= error;
+        store->error_code = error;
         return OPEN_ERROR;
     }
 
     if (filesize.QuadPart < 0)
     { // If file size is valid
-        DWORD error= GetLastError();
         CloseHandle(file);
         printf("Invalid size returned\n");
-        store->error_code= error;
+        store->error_code = INVALID_FILE_SIZE;
         return OPEN_ERROR;
     }
 
     store->size = (unsigned long long)filesize.QuadPart;
     store->file = file;
-    store->bytesread=0;
-    store->position=0;
-    printf("Successful implemetation\n");
+    printf("Successful implementation\n");
+    store->error_code = ERROR_SUCCESS; // Reset error code on success
 
     return OPEN_SUCCESS;
 }
 
-int main(void)
+void destroy(Binstorage *store)
 {
-    /*wchar_t cwd[MAX_PATH];
+    if (store == NULL)
+    {
+        return;
+    }
+
+    if (store->file != INVALID_HANDLE_VALUE)
+    {
+
+        CloseHandle(store->file);
+    }
+    free(store);
+}
+
+/*int main(void)
+{
+    wchar_t cwd[MAX_PATH];
 
     GetCurrentDirectoryW(MAX_PATH, cwd);
 
@@ -122,5 +122,5 @@ int main(void)
     printf("File size: %llu bytes\n", store->size);
     printf("Current position: %llu\n", store->position);
 
-    return 0;*/
-}
+    return 0;
+}*/
