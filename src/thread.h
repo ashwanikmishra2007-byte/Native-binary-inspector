@@ -4,6 +4,8 @@
 #include <windows.h>
 #include "filereader.h"
 
+typedef unsigned (__stdcall *ThreadFunction)(void *);   //ThreadFunction is a function pointer type that describes the function a newly created thread is allowed to execute.
+
 typedef struct
 {
     HANDLE handle;   // Handle to the thread

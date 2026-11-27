@@ -1,7 +1,5 @@
 #include "thread.h"
 
-typedef DWORD(WINAPI *ThreadFunction)(LPVOID);
-
 Thread *creatth(void)
 {
     Thread *worker = malloc(sizeof(*worker));
@@ -57,7 +55,7 @@ This is a function pointer. It represents the function that the newly created th
     return worker;
 }
 
-bool threajoin(Thread *worker)
+bool threadjoin(Thread *worker)
 {
     if (worker == NULL || !worker->valid)
     {
